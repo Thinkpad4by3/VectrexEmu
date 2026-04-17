@@ -27,4 +27,6 @@ void initROM(mem_bus* mem, uint8_t rom_image[], uint16_t rom_image_size);
 uint8_t readByte(mem_bus* mem, uint16_t addr) ;
 void writeByte(mem_bus* mem, uint16_t addr, uint8_t data);
 
+uint16_t read16B(mem_bus* mem, uint16_t addr);
+
 #endif

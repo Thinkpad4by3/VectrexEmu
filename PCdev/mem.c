@@ -2,7 +2,7 @@
 #include <stdint.h>
 
 void initROM(mem_bus* mem, uint8_t rom_image[], uint16_t rom_image_size) {
-    if(rom_image_size = ROM_SIZE + ROM_SIZE) { //MINESWEEPER + BIOS ROM
+    if(rom_image_size == ROM_SIZE + ROM_SIZE) { //MINESWEEPER + BIOS ROM
         for(uint16_t i = 0;i < ROM_SIZE;i++) {
             mem->MINESTORM[i] = rom_image[i];
             mem->BIOS[i] = rom_image[i+ROM_SIZE];
@@ -37,6 +37,6 @@ void writeByte(mem_bus* mem, uint16_t addr, uint8_t data) {
 }
 
 uint16_t read16B(mem_bus* mem, uint16_t addr) {
-    printf("RESET LOCATION: %02x + %02x \n",readByte(mem,addr), readByte(mem,addr+1));
+    //printf("RESET LOCATION: %02x + %02x \n",readByte(mem,addr), readByte(mem,addr+1));
     return (readByte(mem,addr) << 8) + readByte(mem,addr+1);
 }
