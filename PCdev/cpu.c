@@ -140,7 +140,7 @@ void LD(cpu_sm* cpu, mem_bus* mem, uint8_t* r8) {
     addressing_decode(cpu, mem); //gets the correct addressed 16-bit value into temp_register, using the correct number of cycles
     if(cpu->addr_mode_cntr == DONE) { //perform load operation when addressing complete.
         *r8 = readByte(mem, cpu->temp_register);
-        cpu->instruction_state = INSTRUCTION_COMPLETE;
+        cpu->instruction_state = INSTRUCTION_COMPLETE; //so this instruction takes only 2 cycles so the read is basically free.
     }
     return;
 }
