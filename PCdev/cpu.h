@@ -109,40 +109,6 @@ typedef struct {   //CPU related stuff.
 } cpu_sm; // CPU state machine & registers.
 
 
-void cpu_init(cpu_sm* cpu, mem_bus* mem);
-void cpu_step(cpu_sm* cpu, mem_bus* mem);
-
-//void ADD(cpu_sm* cpu);
-void CLR(cpu_sm* cpu, mem_bus* mem);
-void LD(cpu_sm* cpu, mem_bus* mem, uint8_t* r8);
-void LD16(cpu_sm* cpu, mem_bus* mem, uint16_t* r16);
-void JSR(cpu_sm* cpu, mem_bus* mem);
-void BSR(cpu_sm* cpu, mem_bus* mem);
-void RTS(cpu_sm* cpu, mem_bus* mem);
-void TFR(cpu_sm* cpu, mem_bus* mem);
-
-void decode_instruction(cpu_sm* cpu, mem_bus* mem);
-void load_full_instruction(cpu_sm* cpu, mem_bus* mem);
-
-void addressing_decode(cpu_sm* cpu, mem_bus* mem);
-
-void get_addressing_mode(cpu_sm* cpu);
-
-uint8_t* get_register_pointer(cpu_sm* cpu, uint8_t postcode);
-void indexing_addressing_decode(cpu_sm* cpu, mem_bus* mem);
-uint8_t* get_register_pointer(cpu_sm* cpu, uint8_t postcode);
-uint16_t* get_register16_pointer(cpu_sm* cpu, uint8_t postcode);
-
-inline uint8_t get_cc_n_flag(cpu_sm* cpu);
-inline void set_cc_n_flag(cpu_sm* cpu, uint8_t flag);
-
-void push(cpu_sm* cpu, mem_bus* mem, uint8_t data);
-uint8_t pop(cpu_sm* cpu, mem_bus* mem);
-
-void print_instruction(cpu_sm* cpu);
-
-
-
 
 #endif
 
