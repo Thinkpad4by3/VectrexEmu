@@ -25,7 +25,16 @@
 #define RELATIVE  4
 #define ACCUM_A   5
 #define ACCUM_B   6
-#define NONE      7
+#define INST_DEF  7 //INSTRUCTION DEFINED
+//ADD INDEXING SPECIFIC MODES??
+
+//INSTRUCTION GROUPS
+#define LOW_GROUP    0 //0x00 - 0x80 multi-addr mode instructions
+#define HIGH_GROUP   1 //0x81 - 0xFF multi-addr mode instructions
+#define BRANCH_GROUP 2 //0x20 - 0x2F branch instructions
+#define STACK_GROUP  3 //0x30 - 0x3F stack related instructions (and MUL/SWI)
+#define OTHER_GROUP  4 //0x10 - 0x1F other stuff, NOP, PAGE2/3 etc.
+
 
 //INDEXED ADDRESSING MODES
 /*#define OFFSET_0B  0b0100
@@ -47,9 +56,9 @@
 #define REG_16BIT 1
 
 //2-BYTE INSTRUCTIONS
-#define BASE_PAGE 0
-#define PAGE2 0x10
-#define PAGE3 0x11
+#define BASE_PAGE 1
+#define PAGE2 1
+#define PAGE3 2
 
 //FOR PC_IRQ_REQ to look nice.
 #define SERVICED  0
@@ -58,21 +67,35 @@
 
 #define DONE 0xFF
 
-#define REG_A  0b1000
-#define REG_B  0b1001
-#define REG_CC 0b1010
-#define REG_DP 0b1011
+#define REG_A  0
+#define REG_B  1
+#define REG_CC 2
+#define REG_DP 3
 
-#define REG_X 0
-#define REG_Y 1
-#define REG_U 2 
-#define REG_S 3
+#define REG_X  4
+#define REG_Y  5
+#define REG_U  6
+#define REG_S  7
 
+#define REG_TEMP 8
+
+//for the micro-op engine.
+#define EXECUTE 0
+#define DECODE  1
+
+#define NOP     0x00
+#define LD_LOW  0x10
+#define LD_HIGH 0x20
+#define EXT_SW  0x30
 
 uint32_t instruction_count;
 uint32_t cycle_count;
 
 //typedef void instruction(cpu_sm* cpu, mem_bus* mem); //function type for instructions
+
+typedef struct { //translated instruction set to micro operations.
+    uint8_t op; //INSTRUCTION + OPCODE
+} micro_op;
 
 typedef struct {   //CPU related stuff.
     //REGISTERS
@@ -89,22 +112,20 @@ typedef struct {   //CPU related stuff.
 
     //STATE
     uint8_t cycle_counter;
-    uint8_t instruction_state;
-    uint8_t PC_INC_REQ;
 
-    uint8_t* r8;   //8-bit working reg
-    uint16_t* r16; //16-bit working reg
-    uint8_t working_reg_size;
-    uint8_t addressing_mode;
+    micro_op micro_ops[32];
+    uint8_t micro_op_PC;
+    uint8_t micro_op_SP;
 
-    uint16_t instruction;
-    uint16_t addr_mode_cntr; //used for keeping track of cycles on addressing mode.
-    uint16_t branch_cntr;
-    uint16_t temp_register;
+    //INSTRUCTION DECODE STATE
+    uint8_t mode; //addressing mode
+    uint8_t page;
+    uint8_t working_reg; //active working register
+    uint16_t addr; //effective address after decode
+    uint16_t temp; //16-bit working register.
+    uint8_t reg; //active working register
+    uint8_t decode; //decode or running microcode? 
 
-    uint8_t mode; //indexed mode states
-    uint8_t work_reg;
-    uint8_t direct;
 
 } cpu_sm; // CPU state machine & registers.
 
