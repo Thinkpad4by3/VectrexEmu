@@ -57,8 +57,8 @@
 
 //2-BYTE INSTRUCTIONS
 #define BASE_PAGE 1
-#define PAGE2 1
-#define PAGE3 2
+#define PAGE2 2
+#define PAGE3 3
 
 //FOR PC_IRQ_REQ to look nice.
 #define SERVICED  0
@@ -76,17 +76,40 @@
 #define REG_Y  5
 #define REG_U  6
 #define REG_S  7
-
-#define REG_TEMP 8
+#define REG_ADDR 8
+#define REG_PC 9
 
 //for the micro-op engine.
-#define EXECUTE 0
-#define DECODE  1
+#define EXECUTE  0
+#define DECODE   1
+#define XFR_CTRL 2
 
-#define NOP     0x00
-#define LD_LOW  0x10
-#define LD_HIGH 0x20
-#define EXT_SW  0x30
+//MICROCODE INSTRUCTIONS
+// [R16] = LOAD BYTE AT ADDRESS [R16]
+//  R16  = DATA IN R16
+// XXX YYYYY INSTRUCTION TYPE
+// XXX -> FLAGS.
+#define NOP        0x00
+#define LD_EFF_16  0x01 //LOAD [SRC] -> DST(16)
+#define LD_EFF_8   0x02 //LOAD [SRC] -> DST(8)
+#define LD_R       0x03 //LD SRC -> DST (8 OR 16 BIT, automatic)
+#define EXT_SW     0x04
+#define ADD_S      0x05 //ADD_SIGNED DST += SRC
+#define SWAP_PC    0x06
+#define PUSH       0x07 //PUSH SRC to STACK
+#define POP        0x08
+#define TFR_DEC    0x09 //TFR DECODE POSTCODE
+#define CLR_U      0x10 //CLR8 R8 || CLR16 [MEM]
+
+#define U_LO   0x00 //LOW BYTE FLAG FOR 8->16 U_OPS
+#define U_HI   0x80 //HIGH BYTE FLAG.
+
+#define WRITEBACK 0x40 //WILL TAKE DST AND COPY IT BACK TO SRC IN SAME INSTRUCTION
+
+#define TYPE_8_8   0x00
+#define TYPE_16_8  0x01
+#define TYPE_8_16  0x02
+#define TYPE_16_16 0x03
 
 uint32_t instruction_count;
 uint32_t cycle_count;
@@ -120,20 +143,66 @@ typedef struct {   //CPU related stuff.
     //INSTRUCTION DECODE STATE
     uint8_t mode; //addressing mode
     uint8_t page;
-    uint8_t working_reg; //active working register
-    uint16_t addr; //effective address after decode
-    uint16_t temp; //16-bit working register.
-    uint8_t reg; //active working register
-    uint8_t decode; //decode or running microcode? 
+    uint8_t decode; //CPU decoding or executing?
+    uint8_t inst_reg; //register for instruction
+    uint8_t opcode;
 
+    uint16_t addr; //address internal register
 
+    uint8_t src; //source u_op reg
+    uint8_t dst; //destination u_op reg
+
+    char decomp[64]; //store decompiled text
 } cpu_sm; // CPU state machine & registers.
 
 
 
 #endif
 
+void cpu_init(cpu_sm* cpu, mem_bus* mem);
 
+void print_u_ops(cpu_sm* cpu);
+
+void cpu_step(cpu_sm* cpu, mem_bus* mem);
+
+void increment_pc(cpu_sm* cpu, mem_bus* mem);
+
+void generate_u_op(cpu_sm* cpu, uint8_t op);
+
+void execute_u_op(cpu_sm* cpu, mem_bus* mem);
+
+uint8_t get_u_op_type(cpu_sm* cpu, uint8_t src, uint8_t dst);
+
+uint8_t* get_r8_pointer(cpu_sm* cpu, uint8_t reg);
+
+uint16_t* get_r16_pointer(cpu_sm* cpu, uint8_t reg);
+
+void decode_instruction(cpu_sm* cpu, uint8_t opcode);
+
+uint8_t decode_addr_mode(uint8_t instruction);
+
+uint8_t decode_register(cpu_sm* cpu, uint8_t opcode);
+
+void stack_decode(cpu_sm* cpu,  uint8_t instruction);
+
+void branch_decode(cpu_sm* cpu,  uint8_t instruction);
+
+void low_decode(cpu_sm* cpu, uint8_t instruction);
+
+void other_decode(cpu_sm* cpu, uint8_t instruction);
+
+void high_decode(cpu_sm* cpu, uint8_t instruction);
+
+void generate_addr_mode_u_op(cpu_sm* cpu);
+
+void BSR(cpu_sm* cpu);
+void CLR(cpu_sm* cpu);
+void JSR(cpu_sm* cpu);
+void LD8(cpu_sm* cpu);
+void LD16(cpu_sm* cpu);
+void RTS(cpu_sm* cpu);
+void TFR(cpu_sm* cpu);
+void BAD_OP();
 /*
 TO DO LIST: 
 
