@@ -12,8 +12,16 @@ void cpu_init(cpu_sm* cpu, mem_bus* mem) {
     cpu->PC = read16B(mem, RESET_VECTOR);
     cpu->decode = DECODE;
     cpu->page = BASE_PAGE;
-    cpu->addr = cpu->PC;
+    cpu->addr = 0;
     instruction = 0;
+    cpu->cycle_counter = 0;
+    cpu->micro_op_PC = 0;
+    cpu->micro_op_SP = 0;
+
+    cpu->A = 0;
+    cpu->B = 0;
+    cpu->DP = 0;
+
 }
 
 void print_u_ops(cpu_sm* cpu) {
@@ -46,7 +54,10 @@ void cpu_step(cpu_sm* cpu, mem_bus* mem) {
     uint8_t prev_b = cpu->B;
     uint16_t prev_d = cpu->D;
     cpu->cycle_counter++;
-    printf("CPU STATE: Cycle: %02d | PC: %02X | [PC]: %02X | uOP PC: %02d | uOP SP: %02d | CPU OPcode: %02X | SRC: %d | DST: %d \n", cpu->cycle_counter, cpu->PC, readByte(mem, cpu->PC), cpu->micro_op_PC, cpu->micro_op_SP, cpu->opcode, cpu->src, cpu->dst);
+    //printf("CPU STATE: Cycle: %02d | PC: %02X | [PC]: %02X | uOP PC: %02d | uOP SP: %02d | CPU OPcode: %02X | SRC: %d | DST: %d \n", cpu->cycle_counter, cpu->PC, 0, cpu->micro_op_PC, cpu->micro_op_SP, cpu->opcode, cpu->src, cpu->dst);
+    //printf("CPU REG: PC: %02X | X: %04X | Y: %04X | U: %04X | S: %04X | D: %04X | A: %02X | B: %02X | CC: %02X | DP: %02X | ADDR: %04X | [S+1]: %02X | [S+2]: %02X \n\n", cpu->PC, cpu->X, cpu->Y, cpu->U, cpu->S, cpu->D, cpu->A, cpu->B, cpu->CC, cpu->DP, cpu->addr, 0, 0);
+    //check if its 0x10, if yes then fetch another opcode
+    //save opcode to cpu
     //get opcode
     opcode = readByte(mem, cpu->PC);
     /*switch(opcode) { //special case for the two-byte opcode prefix, return to start new cycle
@@ -68,7 +79,7 @@ void cpu_step(cpu_sm* cpu, mem_bus* mem) {
         cpu->PC++;
         //cpu->mode = decode_addr_mode(opcode);
         //cpu->decode = ADDRMODE;
-       // decode_addr_mode(cpu->opcode);
+        //decode_addr_mode(cpu->opcode);
         //printf("GOT ADDRESSING MODE %d \n", cpu->mode);
         //generate_addr_mode_u_op(cpu); //if inherent, do nothing.
     }
@@ -113,7 +124,7 @@ void cpu_step(cpu_sm* cpu, mem_bus* mem) {
 
         if(cpu->micro_op_PC == cpu->micro_op_SP) { //instruction complete, reset and ready for next instruction.
             cpu->decode = DECODE;
-            printf("FINISHED %s in %d cycles | FULL INSTRUCTION: %X %0*X \n\n", cpu->decomp, cpu->cycle_counter, instruction, length, operand);
+            //printf("FINISHED %s in %d cycles | FULL INSTRUCTION: %X %0*X \n\n", cpu->decomp, cpu->cycle_counter, instruction, length, operand);
             cpu->cycle_counter = 0;
             cpu->page = BASE_PAGE;
             cpu->micro_op_PC = 0;
@@ -126,7 +137,8 @@ void cpu_step(cpu_sm* cpu, mem_bus* mem) {
         }
     }
 
-
+    //printf("CPU STATE: Cycle: %02d | PC: %02X | [PC]: %02X | uOP PC: %02d | uOP SP: %02d | CPU OPcode: %02X | SRC: %d | DST: %d \n", cpu->cycle_counter, cpu->PC, readByte(mem, cpu->PC), cpu->micro_op_PC, cpu->micro_op_SP, cpu->opcode, cpu->src, cpu->dst);
+    //printf("CPU REG: PC: %02X | X: %04X | Y: %04X | U: %04X | S: %04X | D: %04X | A: %02X | B: %02X | CC: %02X | DP: %02X | ADDR: %04X | [S+1]: %02X | [S+2]: %02X \n---------------------------\n", cpu->PC, cpu->X, cpu->Y, cpu->U, cpu->S, cpu->D, cpu->A, cpu->B, cpu->CC, cpu->DP, cpu->addr, readByte(mem, cpu->S+1), readByte(mem, cpu->S+2));
 
     //SYNC A|B & D
     if(prev_a != cpu->A || prev_b != cpu->B) {
@@ -135,9 +147,7 @@ void cpu_step(cpu_sm* cpu, mem_bus* mem) {
         cpu->A = (cpu->D & 0xFF00) >> 8;
         cpu->B = cpu->D & 0xFF;
     }
-    printf("CPU REG: PC: %02X | X: %04X | Y: %04X | U: %04X | S: %04X | D: %04X | A: %02X | B: %02X | CC: %02X | DP: %02X | ADDR: %04X | [S+1]: %02X | [S+2]: %02X \n\n", cpu->PC, cpu->X, cpu->Y, cpu->U, cpu->S, cpu->D, cpu->A, cpu->B, cpu->CC, cpu->DP, cpu->addr, readByte(mem, cpu->S+1), readByte(mem, cpu->S+2));
-    //check if its 0x10, if yes then fetch another opcode
-    //save opcode to cpu
+    
 
     //check addressing mode
     //if not inherent, start putting opcodes in
@@ -239,6 +249,13 @@ void execute_u_op(cpu_sm* cpu, mem_bus* mem) { //tiny instruction set should be 
                                                 (*src)++; //increment memory location after load.
                                                 break;
 
+                        case LD_R:              *dst = *src; break;
+
+                        case LD_R + WRITEBACK:  *dst = *src;
+                                                cpu->src = REG_ADDR; //finish extended switch by putting the src register to addr
+                                                cpu->dst = cpu->inst_reg; //put the instruction register back
+                                                break;
+
                         case EXT_SW:            cpu->src = REG_ADDR; //finish extended switch by putting the src register to addr
                                                 cpu->dst = cpu->inst_reg; //put the instruction register back
                                                 break;
@@ -278,14 +295,14 @@ void execute_u_op(cpu_sm* cpu, mem_bus* mem) { //tiny instruction set should be 
                                                 printf("CLEARED BYTE AT: %04X \n", *dst);
                                                 break;
 
+                        case INC_U:             uint8_t increment = readByte(mem, *src) + 1;
+                                                writeByte(mem, *src, increment);
+                                                printf("INCREMENTED BYTE AT: %04X \n", *src);
+                                                break;
+
                         case IND_PC:            postcode = readByte(mem, *src);
                                                 (*src)++;
                                                 indexed_postcode(cpu, postcode);
-                                                generate_u_op(cpu, NOP);
-                                                generate_u_op(cpu, NOP);
-                                                generate_u_op(cpu, NOP);
-                                                generate_u_op(cpu, NOP);
-                                                generate_u_op(cpu, NOP);
                                                 break;
 
                         case SUB_U:             uint8_t z,v,c,n;
@@ -327,8 +344,29 @@ void indexed_postcode(cpu_sm* cpu, uint8_t postcode) {
     uint8_t reg_field = (postcode & 0x60 >> 5);
     uint8_t offset_5b = (postcode & 0x80 >> 7);
 
+    if(offset_5b == IND_5_OFFSET) {
+
+    }
+
+    switch(index_mode) {
+        case IND_0_OFFSET:  cpu->src = reg_field + REG_X; //registers are in the same order but shifted by 4
+                            generate_u_op(cpu, LD_R + WRITEBACK); 
+                            break;
+
+        case IND_PC_BY_8:   generate_u_op(cpu, LD_EFF_16 + U_LO); //load [PC] -> ADDR
+                            generate_u_op(cpu, ADD_S);
+                            generate_u_op(cpu, EXT_SW);
+                            break;
+    }
+
+    if(indirect == 1) {
+        generate_u_op(cpu, LD_EFF_16 + U_HI);
+        generate_u_op(cpu, LD_EFF_16 + U_LO);
+        generate_u_op(cpu, EXT_SW);
+    }
+
     //add logic for generating the next opcodes.
-    cpu->addr = cpu->X + cpu->D;
+    //cpu->addr = cpu->X + cpu->D;
 }
 
 uint8_t get_u_op_type(cpu_sm* cpu, uint8_t src, uint8_t dst) {
@@ -569,7 +607,7 @@ void low_decode(cpu_sm* cpu, uint8_t instruction) {
         case 9:
         case 10:
         case 11:
-        case 12:
+        case 12: INC(cpu); break;
         case 13:
         case 14: break;
         case 15: CLR(cpu); break;
@@ -619,6 +657,7 @@ void generate_addr_mode_u_op(cpu_sm* cpu) {
         case IMMEDIATE: cpu->src = REG_PC;  //IMMEDIATE means instruction data is contained in operand. Setting src to PC to retrieve it
                         cpu->dst = cpu->inst_reg; //set the dst to copy to the decoded instruction register. LDA...LDS, etc.
                         break;
+
         case EXTENDED:  cpu->src = REG_PC; //EXTENDED means instruction data is contained at absolute 16-bit value in operand
                         cpu->dst = REG_ADDR; //copy the data from operand into addressing register.
                         generate_u_op(cpu, LD_EFF_16 + U_HI); //get high byte from instruction
@@ -631,16 +670,20 @@ void generate_addr_mode_u_op(cpu_sm* cpu) {
                         generate_u_op(cpu, LD_EFF_16 + U_LO + DP_HI); //get low byte + load high byte with DP in one cycle
                         generate_u_op(cpu, EXT_SW);  //switch reg for destination register, switch address for new address. 
                         break;
+
         case ACCUM_A:   cpu->src = REG_A;
                         cpu->dst = REG_A;
                         break;
+
         case ACCUM_B:   cpu->src = REG_B; //for instruction sorting into 8/8
                         cpu->dst = REG_B;
                         break;
+
         case INDEXED:   cpu->src = REG_PC; //setup for opcode generation.
                         cpu->dst = REG_ADDR;
                         generate_u_op(cpu, IND_PC);  //switch reg for destination register, switch address for new address. 
                         break;
+
         case INHERENT:  return;
     }
 }
@@ -672,6 +715,17 @@ void CLR(cpu_sm* cpu) {
         generate_u_op(cpu, NOP);         //padding
     }
 }
+
+void INC(cpu_sm* cpu) {
+    strcpy(cpu->decomp, "INC");
+    //generate_addr_mode_u_op(cpu);
+    generate_u_op(cpu, INC_U);
+    if(get_u_op_type(cpu,cpu->src, cpu->dst) != TYPE_8_8) { //memory operation, pad output
+        generate_u_op(cpu, NOP);         //padding
+        generate_u_op(cpu, NOP);         //padding
+    }
+}
+
 
 void JSR(cpu_sm* cpu) {
     strcpy(cpu->decomp, "JSR");

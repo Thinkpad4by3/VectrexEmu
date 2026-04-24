@@ -27,6 +27,21 @@
 #define ACCUM_B   6
 #define INHERENT  7 //INSTRUCTION DEFINED
 //ADD INDEXING SPECIFIC MODES??
+#define IND_0_OFFSET  0x4
+#define IND_5_OFFSET  0x0 //for some reason gets its own bit position
+#define IND_8_OFFSET  0x8
+#define IND_16_OFFSET 0x9
+#define IND_A_OFFSET  0x6
+#define IND_B_OFFSET  0x5
+#define IND_D_OFFSET  0xB
+#define IND_INC_BY_1  0x0
+#define IND_INC_BY_2  0x1
+#define IND_DEC_BY_1  0x2
+#define IND_DEC_BY_2  0x3
+#define IND_PC_BY_8   0xC
+#define IND_PC_BY_16  0xD
+#define IND_EXT_IND   0xF
+
 
 //INSTRUCTION GROUPS
 #define LOW_GROUP    0 //0x00 - 0x80 multi-addr mode instructions
@@ -105,6 +120,7 @@
 #define IND_PC     0x11 //INDEXED POST-CODE ... will generate instructions based on output.
 #define SUB_U      0x12 //SUB16 INST-REG -= DST (might add similar SUB8 later)
 #define ST_EFF_16  0x13 //STORE DST -> [SRC]
+#define INC_U      0x14 //INCREMENT
 
 #define U_LO   0x00 //LOW BYTE FLAG FOR 8->16 U_OPS
 #define U_HI   0x80 //HIGH BYTE FLAG.
@@ -116,6 +132,22 @@
 #define TYPE_16_8  0x01
 #define TYPE_8_16  0x02
 #define TYPE_16_16 0x03
+
+//NEW instruction codes
+#define NOP      0x00
+#define LOAD_HI  0x01
+#define LOAD_LO  0x02
+#define LOAD_8   0x03
+#define MOVE_HI  0x04
+#define MOVE_LO  0x05
+#define MOVE_8   0x06
+#define MOVE_16  0x07
+#define ADD_SIGN 0x08
+
+//OPERAND MODES.
+#define SRC_DST 0x00
+#define SRC_VAR 0x01
+#define VAR_DST 0x02
 
 //CONDITION CODE STUFF
 #define CARRY       0
@@ -165,11 +197,13 @@ typedef struct {   //CPU related stuff.
     uint8_t inst_reg; //register for instruction
     uint8_t opcode;
 
-    uint16_t addr; //address internal register
-
+    //MICRO-OPS specific stuff
     uint8_t src; //source u_op reg
+    uint8_t var; //used for intermediate work
     uint8_t dst; //destination u_op reg
+
     uint16_t temp; //required for math ops
+    uint16_t addr; //address internal register
 
     char decomp[64]; //store decompiled text
     uint32_t instruction;
@@ -177,7 +211,7 @@ typedef struct {   //CPU related stuff.
 
 
 
-#endif
+
 
 void cpu_init(cpu_sm* cpu, mem_bus* mem);
 
@@ -223,6 +257,7 @@ void generate_indexed_u_op(cpu_sm* cpu);
 
 void BSR(cpu_sm* cpu);
 void CLR(cpu_sm* cpu);
+void INC(cpu_sm* cpu);
 void JSR(cpu_sm* cpu);
 void LD8(cpu_sm* cpu);
 void LD16(cpu_sm* cpu);
@@ -231,6 +266,8 @@ void SUB16(cpu_sm* cpu);
 void ST16(cpu_sm* cpu);
 void TFR(cpu_sm* cpu);
 void BAD_OP();
+
+#endif
 /*
 TO DO LIST: 
 
