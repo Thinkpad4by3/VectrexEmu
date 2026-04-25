@@ -10,6 +10,23 @@ enum addr_mode {
     EXT = 0x30
 };
 
+enum index_mode {
+    R_0D = 0x0,
+    R_5D = 0x1,
+    R_8D = 0x2,
+    R_16D = 0x3,
+    R_A_D = 0x4,
+    R_B_D = 0x5,
+    R_D_D = 0x6,
+    R_P1_D = 0x7,
+    R_P2_D = 0x8,
+    R_D1_D = 0x9,
+    R_D2_D = 0xA,
+    R_PC_8 = 0xB,
+    R_PC_16 = 0xC,
+    R_EXT_IND = 0xD,
+};
+
 enum load_instructions {
     LDA = 0x86,
     LDB = 0xC6
@@ -20,8 +37,10 @@ enum bit_length {
     BIT_16 = 1
 };
 
-const enum load_instructions LOAD[] = {LDA, LDB};
-const enum address_modes     MODE[] = {IMM, DIR, IND, EXT};
+const enum load_instructions LOAD[] = {LDA};
+const enum address_modes     MODE[] = {IND};
+
+const enum indirect_modes    IND_MODE[] = {R_0D, R_5D, R_8D, R_16D, R_A_D, R_B_D, R_D_D, R_PC_8, R_PC_16, R_P1_D};
 
 /*
 Designed to test LOAD instructions.
@@ -31,7 +50,9 @@ Under conditions: IMMEDIATE | DIRECT | INDEXED | EXTENDED addressing modes
 
 void test_instruction_loading() {
 
-
+    //int i = 0;
+    //int j = 1;
+    int indm = 0;
     for(int i = 0;i<sizeof(LOAD)/sizeof(LOAD[0]); i++) {
         for(int j = 0;j<sizeof(MODE)/sizeof(MODE[0]); j++) {
             mem_bus mem_test;
@@ -51,12 +72,13 @@ void test_instruction_loading() {
 
             enum addr_mode mode = MODE[j];
             enum load_instructions inst = LOAD[i];
+            enum index_mode index_mode = IND_MODE[indm];
 
             data_points[dp_index++] = loadData(vector++, inst + mode);
 
             
 
-            cpu_init(&cpu_test, &mem_test);
+            cpu_clear_regs(&cpu_test);
             cpu_expected = cpu_test;
 
             switch(inst) {
@@ -85,8 +107,131 @@ void test_instruction_loading() {
                     printf("DIR \n");
                 } break;
                 case IND: {
-                    //place holder, replace later.
-                    printf("IND \n");
+                    printf("IND ");
+                    switch(index_mode) {
+                        case R_0D: {
+                            cpu_test.X = address;
+                            cpu_expected.X = address;
+
+                            data_points[dp_index++] = loadData(vector++, 0x84);
+                            data_points[dp_index++] = loadData(address, data);
+                            printf("R + 0 OFFSET");
+                            break;
+                        }
+                        case R_5D: {
+                            printf("R + 5 OFFSET");
+                            int8_t offset = -8;
+                            cpu_test.X = address + offset;
+                            cpu_expected.X = address + offset;
+                            
+                            uint8_t packed_value = 0x00 + ((-1*offset) & 0x1F);
+                            data_points[dp_index++] = loadData(vector++, packed_value);
+                            data_points[dp_index++] = loadData(address, data);
+                            break;
+                        }
+                        case R_8D: {
+                            printf("R + 8 OFFSET");
+                            int8_t offset = 53;
+                            cpu_test.X = address + offset;
+                            cpu_expected.X = address + offset;
+
+                            data_points[dp_index++] = loadData(vector++, 0x88);
+                            data_points[dp_index++] = loadData(vector++, -1*offset);
+                            data_points[dp_index++] = loadData(address, data);
+                            break;
+                        }
+                        case R_16D: {
+                            printf("R + 16 OFFSET");
+                            int16_t offset = -1026;
+                            cpu_test.X = address + offset;
+                            cpu_expected.X = address + offset;
+
+                            data_points[dp_index++] = loadData(vector++, 0x89);
+                            data_points[dp_index++] = loadData(vector++, ((-1*offset) & 0xFF00) >> 8);
+                            data_points[dp_index++] = loadData(vector++, (-1*offset) & 0xFF);
+                            data_points[dp_index++] = loadData(address, data);
+                            break;
+                        }
+                        case R_A_D: {
+                            printf("R + A OFFSET");
+                            int16_t offset = -53;
+                            //cpu_expected.A = offset;
+                            cpu_test.A = offset;
+
+                            cpu_test.X = address - offset;
+                            //cpu_expected.X = address - offset;
+
+                            data_points[dp_index++] = loadData(vector++, 0x86);
+                            data_points[dp_index++] = loadData(address, data);
+                            break;
+                        }
+                        case R_B_D: {
+                            printf("R + B OFFSET");
+                            int16_t offset = -53;
+                            //cpu_expected.A = offset;
+                            cpu_test.B = offset;
+
+                            cpu_test.X = address - offset;
+                            //cpu_expected.X = address - offset;
+
+                            data_points[dp_index++] = loadData(vector++, 0x85);
+                            data_points[dp_index++] = loadData(address, data);
+                            break;
+                        }
+                        case R_D_D: {
+                            printf("R + D OFFSET");
+                            int16_t offset = -1026;
+                            //cpu_expected.A = offset;
+                            cpu_test.D = offset;
+
+                            cpu_test.X = address - offset;
+                            //cpu_expected.X = address - offset;
+
+                            data_points[dp_index++] = loadData(vector++, 0x8B);
+                            data_points[dp_index++] = loadData(address, data);
+                            break;
+                        }
+                        case R_PC_8: {
+                            printf("PC + 8 OFFSET");
+                            int16_t offset = 53;
+                            //cpu_expected.A = offset;
+
+                            //cpu_test.X = address - offset;
+                            //cpu_expected.X = address - offset;
+
+                            data_points[dp_index++] = loadData(vector++, 0x8C);
+                            data_points[dp_index++] = loadData(vector++, offset);
+                            data_points[dp_index++] = loadData(vector+offset, data);
+                            break;
+                        }
+                        case R_PC_16: {
+                            printf("PC + 16 OFFSET");
+                            address = 0xF800;
+                            int16_t offset = (vector - address) + 3;
+                            int16_t load = -1 * offset;
+                            //cpu_expected.A = offset;
+
+                            //cpu_test.X = address - offset;
+                            //cpu_expected.X = address - offset;
+
+                            data_points[dp_index++] = loadData(vector++, 0x8D);
+                            data_points[dp_index++] = loadData(vector++, load >> 8);
+                            data_points[dp_index++] = loadData(vector++, load & 0xFF);
+                            data_points[dp_index++] = loadData(address, data);
+                            break;
+                        }
+
+                        case R_P1_D: {
+                            cpu_test.Y = address;
+                            cpu_expected.Y = address+1;
+
+                            data_points[dp_index++] = loadData(vector++, 0xA0);
+                            data_points[dp_index++] = loadData(address, data);
+                            printf("R++");
+                            break;
+                        }
+                    }
+                    printf("\n");
                 } break;           
                 case EXT: {
                     data_points[dp_index++] = loadData(vector++, (address & 0xFF00) >> 8);
@@ -96,7 +241,20 @@ void test_instruction_loading() {
                     printf("EXT \n");
                 }break;
             }
+            cpu_expected = cpu_test;
+
+            switch(inst) {
+                case LDA: {
+                    cpu_expected.A = data;
+                } break;
+                case LDB: {
+                    cpu_expected.B = data;
+                } break;
+            }
             cpu_expected.PC = vector;
+            if(index_mode == R_P1_D) {
+                cpu_expected.Y++;
+            }
 
 
 
@@ -108,7 +266,7 @@ void test_instruction_loading() {
                 }
             }
 
-            
+            cpu_init(&cpu_test, &mem_test);
 
             
             //printf("HEY FUCKETTES ITS THE PC %04X \n", cpu_test.PC);
@@ -130,8 +288,15 @@ void test_instruction_loading() {
             }
             printf("CYCLE COUNT %d \n", cycle_count);
             printf("-----------------------\n");
-        }
-    }
+
+            if((indm < 9) && (mode == IND)) {
+                j--;
+            }
+            if(mode == IND) {
+                indm++;
+            }
+       }
+   }
 }
 
 void print_data_points(memory_mod data_points[], uint8_t dp_index) {
@@ -167,46 +332,6 @@ memory_mod loadData(uint16_t addr, uint8_t data) {
     m.addr = addr;
     m.data = data;
     return m;
-}
-
-void test_LD() {
-    
-    mem_bus mem_test;
-    cpu_sm cpu_test;
-    cpu_sm cpu_expected;
-
-    uint64_t instruction;
-
-    int cycle_count = 0;
-    printf("LOAD TEST \n");
-    //set RESET VECTOR + enter code
-    writeROMByte(&mem_test, 0xFFFE, 0xF0); //set RESET VECTOR to 0z
-    writeROMByte(&mem_test, 0xFFFF, 0x00);
-
-    enum addr_mode test_mode = IND;
-    instruction = LDA+test_mode;
-    cpu_test.X = 0xC802;
-    add_addressing_mode(test_mode, BIT_8, &instruction, &mem_test);
-    load_instruction(instruction, &mem_test);
-    
-    printf("LOAD TEST %04X \n", instruction);
-    cpu_init(&cpu_test, &mem_test);
-    cpu_expected = cpu_test; //copy state
-    cpu_expected.A = 0xAD;
-    for(int i=0;i<10;i++){
-        cpu_step(&cpu_test, &mem_test);
-        cycle_count++;
-        if (cpu_test.cycle_counter == 0) {
-            i=11;
-        }
-    }
-    printf("LOAD TEST \n");
-    if(cycle_count == 4) {
-        printf("INSTRUCTION CYCLE COUNT OK \n");
-    } else {
-        printf("INSTRUCTION CYCLE COUNT INACCURATE, %d \n", cycle_count);
-    }
-    compare_cpu_state(&cpu_test, &cpu_expected);
 }
 
 void compare_cpu_state(cpu_sm* tested, cpu_sm* expected) {

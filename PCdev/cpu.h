@@ -26,9 +26,10 @@
 #define ACCUM_A   5
 #define ACCUM_B   6
 #define INHERENT  7 //INSTRUCTION DEFINED
+
 //ADD INDEXING SPECIFIC MODES??
 #define IND_0_OFFSET  0x4
-#define IND_5_OFFSET  0x0 //for some reason gets its own bit position
+#define IND_5_OFFSET  0x7 //for some reason gets its own bit position
 #define IND_8_OFFSET  0x8
 #define IND_16_OFFSET 0x9
 #define IND_A_OFFSET  0x6
@@ -41,7 +42,6 @@
 #define IND_PC_BY_8   0xC
 #define IND_PC_BY_16  0xD
 #define IND_EXT_IND   0xF
-
 
 //INSTRUCTION GROUPS
 #define LOW_GROUP    0 //0x00 - 0x80 multi-addr mode instructions
@@ -117,7 +117,7 @@
 #define POP        0x08
 #define TFR_DEC    0x09 //TFR DECODE POSTCODE
 #define CLR_U      0x10 //CLR8 R8 || CLR16 [MEM]
-#define IND_PC     0x11 //INDEXED POST-CODE ... will generate instructions based on output.
+
 #define SUB_U      0x12 //SUB16 INST-REG -= DST (might add similar SUB8 later)
 #define ST_EFF_16  0x13 //STORE DST -> [SRC]
 #define INC_U      0x14 //INCREMENT
@@ -134,20 +134,43 @@
 #define TYPE_16_16 0x03
 
 //NEW instruction codes
-#define NOP      0x00
-#define LOAD_HI  0x01
-#define LOAD_LO  0x02
-#define LOAD_8   0x03
-#define MOVE_HI  0x04
-#define MOVE_LO  0x05
-#define MOVE_8   0x06
-#define MOVE_16  0x07
-#define ADD_SIGN 0x08
+#define NOP       0x00
+#define LOAD_HI   0x01
+#define LOAD_LO   0x02
+#define LOAD_8    0x03
+#define MOVE_HI   0x04
+#define MOVE_LO   0x05
+#define MOVE_8    0x06
+#define MOVE_16   0x07
+#define ADD_SIGN  0x08
+#define LOAD_SIGN 0x09
+#define MOVE_SIGN 0x10
+#define IND_PC    0x11 //INDEXED POST-CODE ... will generate instructions based on output.
+#define INC_16    0x12 //SRC = SRC + 1;
+#define DEC_16    0x13 //SRC = SRC - 1;
+#define PUSH_S_HI 0x14
+#define PUSH_S_LO 0x15
+#define POP_S_HI  0x16
+#define POP_S_LO  0x17
+#define TFR_DEC   0x18 //TFR DECODE POSTCODE
+#define CLR_8     0x19
+#define CLR_16    0x20
+#define SUB_16    0x21
+#define STORE_8   0x22
+#define STORE_HI  0x23
+#define STORE_LO  0x24
+
+//INHERENT
+
+//SINGLE OPERAND
+
+//DUAL OPERAND
 
 //OPERAND MODES.
 #define SRC_DST 0x00
 #define SRC_VAR 0x01
 #define VAR_DST 0x02
+#define DST_SRC 0x03 // reversed
 
 //CONDITION CODE STUFF
 #define CARRY       0
@@ -163,6 +186,8 @@
 
 uint32_t instruction_count;
 uint32_t cycle_count;
+
+#define PRINT(x) case x: printf("%s", #x); break;
 
 //typedef void instruction(cpu_sm* cpu, mem_bus* mem); //function type for instructions
 
@@ -215,6 +240,8 @@ typedef struct {   //CPU related stuff.
 
 void cpu_init(cpu_sm* cpu, mem_bus* mem);
 
+void cpu_clear_regs(cpu_sm* cpu);
+
 void print_u_ops(cpu_sm* cpu);
 
 void cpu_step(cpu_sm* cpu, mem_bus* mem);
@@ -225,11 +252,15 @@ void generate_u_op(cpu_sm* cpu, uint8_t op);
 
 uint8_t condition_code_req(cpu_sm* cpu, uint8_t code);
 
+void new_execute_u_op(cpu_sm* cpu, mem_bus* mem);
+
 void execute_u_op(cpu_sm* cpu, mem_bus* mem);
+
+uint16_t sign_extend(uint8_t num);
 
 void indexed_postcode(cpu_sm* cpu, uint8_t postcode);
 
-uint8_t get_u_op_type(cpu_sm* cpu, uint8_t src, uint8_t dst);
+uint8_t get_u_op_type(uint8_t src, uint8_t dst);
 
 uint8_t* get_r8_pointer(cpu_sm* cpu, uint8_t reg);
 
@@ -259,12 +290,15 @@ void BSR(cpu_sm* cpu);
 void CLR(cpu_sm* cpu);
 void INC(cpu_sm* cpu);
 void JSR(cpu_sm* cpu);
+void JMP(cpu_sm* cpu);
 void LD8(cpu_sm* cpu);
 void LD16(cpu_sm* cpu);
 void RTS(cpu_sm* cpu);
 void SUB16(cpu_sm* cpu);
+void ST8(cpu_sm* cpu);
 void ST16(cpu_sm* cpu);
 void TFR(cpu_sm* cpu);
+void TFR_decode(cpu_sm* cpu, uint8_t postcode);
 void BAD_OP();
 
 #endif
