@@ -14,14 +14,15 @@ int main() {
 
     cpu_init(&cpu, &mem);
 
-    for(int i = 0;i<2400;i++) {
+    for(int i = 0;i<2420;i++) {
         //printf("TOTAL RUN: %d \n", i);
         cpu_step(&cpu, &mem);
         if(cpu.cycle_counter == 0) {
             ins_cnt++;
-            printf("%d instruction \n", ins_cnt);
+            printf("%d instruction, cycle %d \n", ins_cnt, i);
         }
     }
+   //test_SUB();
     //test_LD();
     //test_instruction_loading();
 

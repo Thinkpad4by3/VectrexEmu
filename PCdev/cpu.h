@@ -115,7 +115,7 @@
 #define SWAP_PC    0x06
 #define PUSH       0x07 //PUSH SRC to STACK
 #define POP        0x08
-#define TFR_DEC    0x09 //TFR DECODE POSTCODE
+
 #define CLR_U      0x10 //CLR8 R8 || CLR16 [MEM]
 
 #define SUB_U      0x12 //SUB16 INST-REG -= DST (might add similar SUB8 later)
@@ -144,21 +144,36 @@
 #define MOVE_16   0x07
 #define ADD_SIGN  0x08
 #define LOAD_SIGN 0x09
-#define MOVE_SIGN 0x10
-#define IND_PC    0x11 //INDEXED POST-CODE ... will generate instructions based on output.
-#define INC_16    0x12 //SRC = SRC + 1;
-#define DEC_16    0x13 //SRC = SRC - 1;
-#define PUSH_S_HI 0x14
-#define PUSH_S_LO 0x15
-#define POP_S_HI  0x16
-#define POP_S_LO  0x17
-#define TFR_DEC   0x18 //TFR DECODE POSTCODE
-#define CLR_8     0x19
-#define CLR_16    0x20
-#define SUB_16    0x21
-#define STORE_8   0x22
-#define STORE_HI  0x23
-#define STORE_LO  0x24
+#define MOVE_SIGN 0x0A
+#define IND_PC    0x0B //INDEXED POST-CODE ... will generate instructions based on output.
+#define INC_16    0x0C //SRC = SRC + 1;
+#define DEC_16    0x0D //SRC = SRC - 1;
+#define PUSH_S_HI 0x0E
+#define PUSH_S_LO 0x0F
+#define POP_S_HI  0x10
+#define POP_S_LO  0x11
+#define TFR_DEC   0x12 //TFR/EXG DECODE POSTCODE
+#define CLR_8     0x13
+#define CLR_16    0x14
+#define SUB_16    0x15
+#define SUB_8     0x16
+#define STORE_8   0x17
+#define STORE_HI  0x18
+#define STORE_LO  0x19
+#define PSH_DEC   0x1A //PSH/PUL DECODE
+#define PUL_DEC   0x1B
+#define INC_8     0x1C
+#define CMP_8     0x1D
+#define CMP_16    0x1E
+#define SUB_C_8   0x1F //SBC
+#define ADD_8     0x20
+#define ADD_16    0x21
+#define BIT_U_8   0x22
+#define XOR_8     0x23
+#define ADD_C_8   0x24
+#define OR_8      0x25
+#define NEG_8     0x26
+
 
 //INHERENT
 
@@ -240,7 +255,9 @@ typedef struct {   //CPU related stuff.
 
 void cpu_init(cpu_sm* cpu, mem_bus* mem);
 
-void cpu_clear_regs(cpu_sm* cpu);
+void cpu_reset(cpu_sm* cpu);
+
+void cpu_sync_D(cpu_sm* cpu);
 
 void print_u_ops(cpu_sm* cpu);
 
@@ -249,6 +266,8 @@ void cpu_step(cpu_sm* cpu, mem_bus* mem);
 void increment_pc(cpu_sm* cpu, mem_bus* mem);
 
 void generate_u_op(cpu_sm* cpu, uint8_t op);
+
+void set_condition_code_math(cpu_sm* cpu, uint8_t c, uint8_t v, uint8_t n, uint8_t z, uint8_t h);
 
 uint8_t condition_code_req(cpu_sm* cpu, uint8_t code);
 
@@ -293,6 +312,10 @@ void JSR(cpu_sm* cpu);
 void JMP(cpu_sm* cpu);
 void LD8(cpu_sm* cpu);
 void LD16(cpu_sm* cpu);
+void PSHS(cpu_sm* cpu);
+void PSH_decode(cpu_sm* cpu, uint8_t postcode, uint8_t* stack);
+void PULS(cpu_sm* cpu);
+void PUL_decode(cpu_sm* cpu, uint8_t postcode, uint8_t* stack);
 void RTS(cpu_sm* cpu);
 void SUB16(cpu_sm* cpu);
 void ST8(cpu_sm* cpu);

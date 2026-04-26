@@ -21,11 +21,31 @@ void cpu_init(cpu_sm* cpu, mem_bus* mem) {
     cpu->micro_op_SP = 0;
 }
 
-void cpu_clear_regs(cpu_sm* cpu) {
+void cpu_reset(cpu_sm* cpu) {
     cpu->A = 0;
     cpu->B = 0;
     cpu->CC = 0;
     cpu->DP = 0;
+
+    cpu->X = 0;
+    cpu->Y = 0;
+    cpu->S = 0;
+    cpu->U = 0;
+
+    cpu->PC = 0;
+    cpu->D = 0;
+}
+
+void cpu_sync_D(cpu_sm* cpu) {
+    if(cpu->D == (cpu->A << 8) + cpu->B) {
+        return;
+    }
+    if(cpu->D == 0) {
+        cpu->D = (cpu->A << 8) + cpu->B;
+    } else {
+        cpu->A = cpu->D >> 8;
+        cpu->B = cpu->D & 0xFF;
+    }
 }
 /*
 void print_u_ops(cpu_sm* cpu) {
@@ -66,6 +86,7 @@ void print_u_ops(cpu_sm* cpu) {
             PRINT(NOP)
             PRINT(TFR_DEC)
             PRINT(CLR_8)
+            PRINT(PSH_DEC)
         }
         printf(", ");
     }
@@ -80,14 +101,14 @@ void cpu_step(cpu_sm* cpu, mem_bus* mem) {
     uint8_t prev_b = cpu->B;
     uint16_t prev_d = cpu->D;
     cpu->cycle_counter++;
-    printf("CPU STATE: Cycle: %02d | PC: %02X | [PC]: %02X | uOP PC: %02d | uOP SP: %02d | CPU OPcode: %02X | SRC: %d | VAR: %d | DST: %d \n", cpu->cycle_counter, cpu->PC, readByte(mem, cpu->PC), cpu->micro_op_PC, cpu->micro_op_SP, cpu->opcode, cpu->src, cpu->var, cpu->dst);
-    printf("CPU REG: PC: %02X | X: %04X | Y: %04X | U: %04X | S: %04X | D: %04X | A: %02X | B: %02X | CC: %02X | DP: %02X | ADDR: %04X | TEMP: %04X \n\n", cpu->PC, cpu->X, cpu->Y, cpu->U, cpu->S, cpu->D, cpu->A, cpu->B, cpu->CC, cpu->DP, cpu->addr, cpu->temp);
+    //printf("CPU STATE: Cycle: %02d | PC: %02X | [PC]: %02X | uOP PC: %02d | uOP SP: %02d | CPU OPcode: %02X | SRC: %d | VAR: %d | DST: %d \n", cpu->cycle_counter, cpu->PC, readByte(mem, cpu->PC), cpu->micro_op_PC, cpu->micro_op_SP, cpu->opcode, cpu->src, cpu->var, cpu->dst);
+    //printf("CPU REG: PC: %02X | X: %04X | Y: %04X | U: %04X | S: %04X | D: %04X | A: %02X | B: %02X | CC: %02X | DP: %02X | ADDR: %04X | TEMP: %04X \n\n", cpu->PC, cpu->X, cpu->Y, cpu->U, cpu->S, cpu->D, cpu->A, cpu->B, cpu->CC, cpu->DP, cpu->addr, cpu->temp);
     //check if its 0x10, if yes then fetch another opcode
     //save opcode to cpu
     //print_u_ops(cpu);
     //get opcode
     opcode = readByte(mem, cpu->PC);
-    printf("LD16, INST_REG: %d \n",cpu->inst_reg);
+
     /*switch(opcode) { //special case for the two-byte opcode prefix, return to start new cycle
         case 0x10:  cpu->page = PAGE2; cpu->PC++; return;
         case 0x11:  cpu->page = PAGE3; cpu->PC++; return;
@@ -102,6 +123,7 @@ void cpu_step(cpu_sm* cpu, mem_bus* mem) {
             default:    cpu->decode = ADDRMODE;
                         cpu->mode = decode_addr_mode(opcode);
                         cpu->inst_reg = decode_register(cpu, opcode);
+                        set_condition_code_math(cpu, NOT_AFFECTED, NOT_AFFECTED, NOT_AFFECTED, 1, NOT_AFFECTED);
                         generate_addr_mode_u_op(cpu);
         }
         cpu->PC++;
@@ -167,8 +189,8 @@ void cpu_step(cpu_sm* cpu, mem_bus* mem) {
         }
     }
 
-    printf("CPU STATE: Cycle: %02d | PC: %02X | [PC]: %02X | uOP PC: %02d | uOP SP: %02d | CPU OPcode: %02X | SRC: %d | VAR: %d | DST: %d \n", cpu->cycle_counter, cpu->PC, readByte(mem, cpu->PC), cpu->micro_op_PC, cpu->micro_op_SP, cpu->opcode, cpu->src, cpu->var, cpu->dst);
-    printf("CPU REG: PC: %02X | X: %04X | Y: %04X | U: %04X | S: %04X | D: %04X | A: %02X | B: %02X | CC: %02X | DP: %02X | ADDR: %04X | TEMP: %04X \n\n", cpu->PC, cpu->X, cpu->Y, cpu->U, cpu->S, cpu->D, cpu->A, cpu->B, cpu->CC, cpu->DP, cpu->addr, cpu->temp);
+    //printf("CPU STATE: Cycle: %02d | PC: %02X | [PC]: %02X | uOP PC: %02d | uOP SP: %02d | CPU OPcode: %02X | SRC: %d | VAR: %d | DST: %d \n", cpu->cycle_counter, cpu->PC, readByte(mem, cpu->PC), cpu->micro_op_PC, cpu->micro_op_SP, cpu->opcode, cpu->src, cpu->var, cpu->dst);
+    //printf("CPU REG: PC: %02X | X: %04X | Y: %04X | U: %04X | S: %04X | D: %04X | A: %02X | B: %02X | CC: %02X | DP: %02X | ADDR: %04X | TEMP: %04X \n\n", cpu->PC, cpu->X, cpu->Y, cpu->U, cpu->S, cpu->D, cpu->A, cpu->B, cpu->CC, cpu->DP, cpu->addr, cpu->temp);
 
     //SYNC A|B & D
     if(prev_a != cpu->A || prev_b != cpu->B) {
@@ -218,7 +240,7 @@ void set_condition_code_math(cpu_sm* cpu, uint8_t c, uint8_t v, uint8_t n, uint8
     }
     if (z != NOT_AFFECTED) {
         switch(z) {
-            case 0: cpu->CC &= ~ (1 << ZERO); //CLEAR C
+            case 0: cpu->CC &= ~ (1 << ZERO); break; //CLEAR C
             case 1: cpu->CC |= 1 << ZERO; 
         }
     }
@@ -257,7 +279,7 @@ void new_execute_u_op(cpu_sm* cpu, mem_bus* mem) { //tiny instruction set should
     op_type = get_u_op_type(src,dst);
 
     //printf("LOOK AT THE OPCODE: %02X, OPERAND: %X, OPTYPE %X, SRC %d, DST %d \n", opcode, operands, op_type, src, dst);
-
+    uint8_t z,v,c,n, h;
     switch(op_type) {
         case TYPE_16_16: {
             uint16_t* src_ptr = get_r16_pointer(cpu, src);
@@ -289,7 +311,11 @@ void new_execute_u_op(cpu_sm* cpu, mem_bus* mem) { //tiny instruction set should
                 case ADD_SIGN:  *dst_ptr += *src_ptr;              //add two numbers lol.
                                 break;
 
-                case INC_16:    (*src_ptr)++;
+                case INC_16:    v = (*src_ptr = 0x7F) ? 1 : 0;
+                                (*src_ptr)++;
+                                z = (*src_ptr = 0x00) ? 1 : 0;
+                                n = (*src_ptr >> 7 == 0x1) ? 1 : 0;
+                                set_condition_code_math(cpu, NOT_AFFECTED, v, n, z, NOT_AFFECTED);
                                 break;
 
                 case DEC_16:    (*src_ptr)--;
@@ -321,15 +347,12 @@ void new_execute_u_op(cpu_sm* cpu, mem_bus* mem) { //tiny instruction set should
                                 printf("CLEAR AT %04X \n", *src_ptr); 
                                 break;
 
-                case SUB_16:    uint8_t z,v,c,n;
-                                *dst_ptr -= *src_ptr;
+                case SUB_16:    *dst_ptr -= *src_ptr;
                                 n = ((int16_t) (*dst_ptr) < 0) ? 1 : 0; //set negative flag if tripped
-                                set_condition_code_math(cpu, NOT_AFFECTED, NOT_AFFECTED, n, NOT_AFFECTED, NOT_AFFECTED);
-                                if(n == 1) {
-                                    printf("NEGATIVE FLAG TRIPPED, %d \n", n);
-                                } else {
-                                    printf("STILL POSITIVE %d \n", n);
-                                }
+                                z = (*dst_ptr == 0) ? 1 : 0;
+                                v = 0; //figure this out later.
+                                c = 0;
+                                set_condition_code_math(cpu, c, v, n, z, NOT_AFFECTED);
                                 break;
                 
                 case STORE_HI:  writeByte(mem, *src_ptr, *dst_ptr >> 8); //write to top 8-bits
@@ -340,6 +363,9 @@ void new_execute_u_op(cpu_sm* cpu, mem_bus* mem) { //tiny instruction set should
                 case STORE_LO:  writeByte(mem, *src_ptr, *dst_ptr & 0xFF); //write to top 8-bits
                                 printf("STORED %02X AT %04X \n", *dst_ptr &0xFF, *src_ptr);
                                 (*src_ptr)++; //increment memory location after load.
+                                break;
+
+                case PSH_DEC:   PSH_decode(cpu, src, dst);
                                 break;
             } break;
         }
@@ -384,6 +410,9 @@ void new_execute_u_op(cpu_sm* cpu, mem_bus* mem) { //tiny instruction set should
                                 break;
 
                 case CLR_8:     *src_ptr = 0;
+                                break;
+
+                case INC_8:     *src_ptr++;
                                 break;
             } break;
         }
@@ -678,18 +707,18 @@ void branch_decode(cpu_sm* cpu, uint8_t instruction) {
         case 0x0: branch = 1; break;
         case 0x1: branch = 0; break;
         case 0x2: //put in other conditionals
-        case 0x3: assert(1);
-        case 0x4: assert(1);
-        case 0x5: assert(1);
-        case 0x6: assert(1);
-        case 0x7: assert(1);
-        case 0x8: assert(1);
-        case 0x9: assert(1);
+        case 0x3: assert(0);
+        case 0x4: assert(0);
+        case 0x5: assert(0);
+        case 0x6: assert(0);
+        case 0x7: branch = !condition_code_req(cpu, ZERO); break;
+        case 0x8: assert(0);
+        case 0x9: assert(0);
         case 0xA: branch = !condition_code_req(cpu, NEGATIVE); break;
-        case 0xB: assert(1);
-        case 0xC: assert(1);
-        case 0xD: assert(1);
-        case 0xE: assert(1);
+        case 0xB: assert(0);
+        case 0xC: assert(0);
+        case 0xD: assert(0);
+        case 0xE: assert(0);
         case 0xF: break;
     }
     strcpy(cpu->decomp, "BRANCH");
@@ -708,22 +737,22 @@ void branch_decode(cpu_sm* cpu, uint8_t instruction) {
 
 void stack_decode(cpu_sm* cpu, uint8_t instruction) {
     switch(instruction & 0xF) {
-        case 0: assert(1);
-        case 1: assert(1);
-        case 2: assert(1);
-        case 3: assert(1);
-        case 4: assert(1);
-        case 5: assert(1);
-        case 6: assert(1);
-        case 7: assert(1);
-        case 8: assert(1); break;
+        case 0: assert(0);
+        case 1: assert(0);
+        case 2: assert(0);
+        case 3: assert(0); break;
+        case 4: PSHS(cpu); break;
+        case 5: PULS(cpu); break;
+        case 6: assert(0);
+        case 7: assert(0);
+        case 8: assert(0); break;
         case 9: RTS(cpu); break;
-        case 10: assert(1);
-        case 11: assert(1);
-        case 12: assert(1);
-        case 13: assert(1);
-        case 14: assert(1);
-        case 15: assert(1); break;
+        case 10: assert(0);
+        case 11: assert(0);
+        case 12: assert(0);
+        case 13: assert(0);
+        case 14: assert(0);
+        case 15: assert(0); break;
     }
 }
 
@@ -731,40 +760,40 @@ void other_decode(cpu_sm* cpu, uint8_t instruction) {
     switch(instruction & 0xF) {
         case 0: cpu->page = PAGE2; return; //this should never execute because of the special case before
         case 1: cpu->page = PAGE3; return; 
-        case 2:  assert(1);
-        case 3: assert(1);
-        case 4: assert(1);
-        case 5: assert(1);
-        case 6: assert(1);
-        case 7: assert(1);
-        case 8: assert(1);
-        case 9: assert(1);
-        case 10: assert(1);
-        case 11: assert(1);
-        case 12: assert(1);
-        case 13: assert(1);
-        case 14: assert(1); break;
+        case 2: assert(0);
+        case 3: assert(0);
+        case 4: assert(0);
+        case 5: assert(0);
+        case 6: assert(0);
+        case 7: assert(0);
+        case 8: assert(0);
+        case 9: assert(0);
+        case 10: assert(0);
+        case 11: assert(0);
+        case 12: assert(0);
+        case 13: assert(0);
+        case 14: assert(0); break;
         case 15: TFR(cpu); break;
     }
 }
 
 void low_decode(cpu_sm* cpu, uint8_t instruction) {
-    printf("instruction %0x \n", instruction);
+    //printf("instruction %0x \n", instruction);
     switch(instruction & 0xF) {
-        case 0: assert(1);
-        case 1: assert(1);
-        case 2: assert(1);
-        case 3: assert(1);
-        case 4: assert(1);
-        case 5: assert(1);
-        case 6: assert(1);
+        case 0: assert(0);
+        case 1: assert(0);
+        case 2: assert(0);
+        case 3: assert(0);
+        case 4: assert(0);
+        case 5: assert(0);
+        case 6: assert(0);
         case 7: break;
-        case 8: assert(1);
-        case 9: assert(1);
-        case 10: assert(1);
-        case 11: assert(1);
+        case 8: assert(0);
+        case 9: assert(0);
+        case 10: assert(0);
+        case 11: assert(0);
         case 12: INC(cpu); break;
-        case 13: assert(1);
+        case 13: assert(0);
         case 14: JMP(cpu); break;
         case 15: CLR(cpu); break;
     }
@@ -773,25 +802,25 @@ void low_decode(cpu_sm* cpu, uint8_t instruction) {
 void high_decode(cpu_sm* cpu, uint8_t instruction) {
     uint8_t highbyte = (instruction & 0xF0) >> 4;
     switch(instruction & 0xF) {
-        case 0: assert(1);
-        case 1: assert(1);
-        case 2: assert(1);
+        case 0: assert(0);
+        case 1: assert(0);
+        case 2: assert(0);
         case 3: switch(cpu->page) {
-                    case BASE_PAGE: SUB16(cpu);
-                    default: assert(1);
+                    case BASE_PAGE: SUB16(cpu); break;
+                    default: assert(0);
                 } break;
-        case 4: assert(1);
-        case 5: assert(1);
+        case 4: assert(0);
+        case 5: assert(0);
         case 6: LD8(cpu); break;
         case 7: ST8(cpu); break;
-        case 8: assert(1);
-        case 9: assert(1);
-        case 10: assert(1);
-        case 11: assert(1); break;
+        case 8: assert(0);
+        case 9: assert(0);
+        case 10: assert(0);
+        case 11: assert(0); break;
         case 12: if ((instruction & 0x40) >> 6 == 1) {
                     LD16(cpu);
                 } else {
-                    assert(1);
+                    assert(0);
                     //CMP16;
                 } break;
         case 13: switch(highbyte) {
@@ -799,13 +828,13 @@ void high_decode(cpu_sm* cpu, uint8_t instruction) {
                     case 9: 
                     case 10:
                     case 11: JSR(cpu); break;
-                    case 12: assert(1);
+                    case 12: assert(0);
                     case 13:
                     case 14:
                     case 15: ST16(cpu); break;
                  } break;
         case 14: LD16(cpu); break; //LDX LDY LDU LDS depending on PAGE2 & 3RD BIT
-        case 15: assert(1); break;
+        case 15: assert(0); break;
     }
 }
 
@@ -918,10 +947,14 @@ void CLR(cpu_sm* cpu) {
 void INC(cpu_sm* cpu) {
     strcpy(cpu->decomp, "INC");
     //generate_addr_mode_u_op(cpu);
-    generate_u_op(cpu, INC_U);
-    if(get_u_op_type(cpu->src, cpu->dst) != TYPE_8_8) { //memory operation, pad output
+    if(cpu->mode != ACCUM_A && cpu->mode != ACCUM_B) {
+        cpu->src = REG_ADDR;
+        cpu->dst = REG_TMP;
+        generate_u_op(cpu, (INC_16 << 2) + SRC_DST);
         generate_u_op(cpu, NOP);         //padding
         generate_u_op(cpu, NOP);         //padding
+    } else {
+        generate_u_op(cpu, (INC_8 << 2) + SRC_DST);
     }
 }
 
@@ -974,8 +1007,92 @@ void LD16(cpu_sm* cpu) {
 }
 
 void PSHS(cpu_sm* cpu) {
-    
+    strcpy(cpu->decomp, "PSHS");
+
+    cpu->src = REG_PC; //for loading postbyte
+    cpu->var = REG_TMP; //put postbyte for decode
+    cpu->dst = REG_S; //S-stack
+    generate_u_op(cpu, (LOAD_LO<<2) + SRC_VAR);
+    generate_u_op(cpu, NOP);
+    generate_u_op(cpu, NOP);
+    generate_u_op(cpu, (PSH_DEC<<2) + VAR_DST);
 } 
+
+void PULS(cpu_sm* cpu) {
+    strcpy(cpu->decomp, "PULS");
+
+    cpu->src = REG_PC; //for loading postbyte
+    cpu->var = REG_TMP; //put postbyte for decode
+    cpu->dst = REG_S; //S-stack
+    generate_u_op(cpu, (LOAD_LO<<2) + SRC_VAR);
+    generate_u_op(cpu, NOP);
+    generate_u_op(cpu, NOP);
+    generate_u_op(cpu, (PUL_DEC<<2) + VAR_DST);
+} 
+
+void PSH_decode(cpu_sm* cpu, uint8_t src, uint8_t dst) {
+    uint16_t* src_ptr = get_r16_pointer(cpu, src);
+    uint16_t* dst_ptr = get_r16_pointer(cpu, dst); //calculate the actual pointers for the working registers.
+    //stack contains REG_S or REG_U depending.
+    //printf("GOT THIS FAR %x\n", src_ptr);
+    uint8_t reg_order[] = {REG_PC, REG_S, REG_Y, REG_X, REG_DP, REG_B, REG_A, REG_CC}; //reg_s should be swappable with reg_u but i'm not doing that right now.
+    uint8_t status = *src_ptr >> 8;
+    uint8_t postcode = *src_ptr & 0xFF;
+    uint8_t bit_set = postcode & 0x1;
+    printf("SRCPTR = %X \n", *src_ptr);
+    printf("RAN PSH_DEC \n");
+    do {
+        if(bit_set) {
+            //push stack
+            //PSH_decode again
+            printf("PUSH TO STACK!! \n");
+            generate_u_op(cpu, (PSH_DEC<<2) + VAR_DST);
+            status++;
+            postcode = postcode >> 1;
+            bit_set = postcode & 0x1;
+            printf("DECREMENTED, %X, STATUS: %d \n", postcode, status);
+            break;
+        }
+        status++;
+        postcode = postcode >> 1;
+        bit_set = postcode & 0x1;
+        printf("DECREMENTED, %X, STATUS: %d \n", postcode, status);
+    } while(status < 8);
+
+    *src_ptr = (status << 8) + postcode;
+}
+
+void PUL_decode(cpu_sm* cpu, uint8_t src, uint8_t dst) {
+    uint16_t* src_ptr = get_r16_pointer(cpu, src);
+    uint16_t* dst_ptr = get_r16_pointer(cpu, dst); //calculate the actual pointers for the working registers.
+    //stack contains REG_S or REG_U depending.
+    //printf("GOT THIS FAR %x\n", src_ptr);
+    uint8_t reg_order[] = {REG_PC, REG_S, REG_Y, REG_X, REG_DP, REG_B, REG_A, REG_CC}; //reg_s should be swappable with reg_u but i'm not doing that right now.
+    uint8_t status = *src_ptr >> 8;
+    uint8_t postcode = *src_ptr & 0xFF;
+    uint8_t bit_set = postcode & 0x1;
+    printf("SRCPTR = %X \n", *src_ptr);
+    printf("RAN PSH_DEC \n");
+    do {
+        if(bit_set) {
+            //push stack
+            //PSH_decode again
+            printf("PULL FROM STACK!! \n");
+            generate_u_op(cpu, (PUL_DEC<<2) + VAR_DST);
+            status++;
+            postcode = postcode >> 1;
+            bit_set = postcode & 0x1;
+            printf("DECREMENTED, %X, STATUS: %d \n", postcode, status);
+            break;
+        }
+        status++;
+        postcode = postcode >> 1;
+        bit_set = postcode & 0x1;
+        printf("DECREMENTED, %X, STATUS: %d \n", postcode, status);
+    } while(status < 8);
+
+    *src_ptr = (status << 8) + postcode;
+}
 
 void RTS(cpu_sm* cpu) {
     strcpy(cpu->decomp, "RTS");

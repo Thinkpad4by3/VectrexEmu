@@ -14,6 +14,10 @@ void initRAM(mem_bus* mem) {
     for(uint16_t i = BASE_RAM;i < BASE_RAM + RAM_SIZE;i++) {
         writeByte(mem,i,0xA5); // seeding for RNG.
     }
+
+    for(uint16_t i = BASE_BIOS;i < BASE_BIOS + ROM_SIZE;i++) {
+        writeROMByte(mem,i,0x00); // erase ROM
+    }
 }
 
 uint8_t readByte(mem_bus* mem, uint16_t addr) {
